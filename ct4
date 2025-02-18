@@ -1,0 +1,76 @@
+ct 4
+
+import pandas as pd
+import psycopg2
+
+db_params = {
+    'dbname': 'home',
+    'user': 'student',
+    'password': 'gendalfthegreat',
+    'host': '212.8.247.94',
+    'port': '5432'
+}
+
+def load_data_from_excel(/Users/daniilli/Downloads/medicine.xlsx, sheet_name):
+    df = pd.read_excel(file_path, sheet_name=sheet_name)
+    return df
+
+def get_db_connection():
+    conn = psycopg2.connect(*db_params)
+    return conn
+
+def get_med_data():
+    conn = get_db_connection()
+    query_an_name = "SELECT * FROM de.med_an_name"
+    query_name = "SELECT * FROM de.med_name"
+    
+    an_name_df = pd.read_sql(query_an_name, conn)
+    name_df = pd.read_sql(query_name, conn)
+    
+    conn.close()
+    
+    return an_name_df, name_df
+
+def process_data(df, an_name_df, name_df, mode):
+    result = []
+    
+    for index, row in df.iterrows():
+        patient_code = row['Код пациента']
+        test_name = row['анализ']
+        test_value = row['значение']
+
+        norm = an_name_df.loc[an_name_df['анализ'] == test_name]
+        if not norm.empty:
+            normal_range = (norm['min'].values[0], norm['max'].values[0])
+            if test_value < normal_range[0]:
+                result.append((patient_code, test_name, 'Понижен'))
+            elif test_value > normal_range[1]:
+                result.append((patient_code, test_name, 'Повышен'))
+    
+    if mode == 'hard':
+        patient_counts = pd.DataFrame(result, columns=['Код пациента', 'анализ', 'заключение'])
+        filtered_result = patient_counts.groupby('Код пациента').filter(lambda x: len(x) >= 2)
+    else:
+        filtered_result = pd.DataFrame(result, columns=['Код пациента', 'анализ', 'заключение'])
+
+    return filtered_result
+
+def save_to_excel(df, file_name):
+    df.to_excel(file_name, index=False)
+
+def main():
+    
+    file_path = 'medicine.xlsx'
+    easy_data = load_data_from_excel(file_path, 'easy')
+    hard_data = load_data_from_excel(file_path, 'hard')
+
+    an_name_df, name_df = get_med_data()
+
+    easy_result = process_data(easy_data, an_name_df, name_df, mode='easy')
+    save_to_excel(easy_result, 'easy_results.xlsx')
+
+    hard_result = process_data(hard_data, an_name_df, name_df, mode='hard')
+    save_to_excel(hard_result, 'hard_results.xlsx')
+
+if __name__ == "__main__":
+    main()
