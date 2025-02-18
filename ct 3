@@ -53,3 +53,79 @@ JOIN (
 ON temp_1.ip = temp_2.ip;
 
  SELECT * FROM ST.LIDS_BOOK_INFO;
+
+2.
+
+CREATE TABLE IF NOT EXISTS st.LIDS_log
+(
+    dt date,
+    link character varying(50) COLLATE pg_catalog."default",
+    user_agent character varying(200) COLLATE pg_catalog."default",
+    region character varying(30) COLLATE pg_catalog."default"
+)
+
+
+	CREATE TABLE IF NOT EXISTS st.LIDS_log_report
+(
+    region character varying(30) COLLATE pg_catalog."default",
+    browser character varying(10) COLLATE pg_catalog."default"
+)
+
+
+
+	INSERT INTO st.LIDS_log (dt, link, user_agent, region) 
+SELECT 
+    d.dt,
+    d.link,
+    d.user_agent,
+    i.region
+FROM 
+    DE.LOG AS d
+JOIN 
+    DE.IP AS i ON d.ip = i.ip;
+
+	SELECT* FROM DE.LOG
+
+
+CREATE TABLE IF NOT EXISTS st.LIDS_log_report
+(
+    region VARCHAR(30),
+    browser VARCHAR(10)
+)
+
+INSERT INTO st.LIDS_log_report (region, browser)
+SELECT
+    region,
+    browser
+FROM (
+    SELECT
+        region,
+        browser,
+        ROW_NUMBER() OVER (PARTITION BY region ORDER BY user_count DESC, browser ASC) AS rnk
+    FROM (
+        SELECT
+            region,
+            CASE
+                WHEN user_agent ILIKE '%Chrome%' THEN 'Chrome'
+                WHEN user_agent ILIKE '%Safari%' THEN 'Safari'
+                WHEN user_agent ILIKE '%Firefox%' THEN 'Firefox'
+                WHEN user_agent ILIKE '%Opera%' THEN 'Opera'
+                WHEN user_agent ILIKE '%Edge%' THEN 'Edge'
+                ELSE 'Other'
+            END AS browser,
+            COUNT(*) AS user_count
+        FROM
+            st.LIDS_log
+        GROUP BY
+            region,
+            CASE
+                WHEN user_agent ILIKE '%Chrome%' THEN 'Chrome'
+                WHEN user_agent ILIKE '%Safari%' THEN 'Safari'
+                WHEN user_agent ILIKE '%Firefox%' THEN 'Firefox'
+                WHEN user_agent ILIKE '%Opera%' THEN 'Opera'
+                WHEN user_agent ILIKE '%Edge%' THEN 'Edge'
+                ELSE 'Other'
+            END
+    ) AS browser_stats
+) AS ranked_browsers
+WHERE rnk = 1;
