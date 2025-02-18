@@ -1,0 +1,55 @@
+ct 3
+CREATE TABLE ST.LIDS_LOG (
+       DT TIMESTAMP,
+       LINK TEXT,
+       USER_AGENT TEXT,
+       REGION TEXT
+   );
+
+CREATE TABLE ST.LIDS_BOOK_INFO AS
+SELECT 
+  CASE 
+    WHEN LENGTH(TRIM(SUBSTRING(value, '<p>(.*?)</p>'))) > 2 THEN SUBSTRING(TRIM(SUBSTRING(value, '<p>(.*?)</p>')), 1, 3) 
+    ELSE TRIM(SUBSTRING(value, '<p>(.*?)</p>'))
+  END AS book_id,
+  TRIM(SUBSTRING(value, '<h1>(.*?)</h1>')) AS genre,
+  CASE 
+    WHEN TRIM(SUBSTRING(value, '<p class="title">(.*?)</p>')) = '' THEN TRIM(SUBSTRING(value, '<p class="author">(.*?)</p>'))
+    ELSE TRIM(SUBSTRING(value, '<p class="title">(.*?)</p>'))
+  END AS title,
+  CASE 
+    WHEN TRIM(SUBSTRING(value, '<p class="title">(.*?)</p>')) = '' THEN NULL
+    ELSE TRIM(SUBSTRING(value, '<p class="author">(.*?)</p>'))
+  END AS author,
+  TRIM(SUBSTRING(value, '<p class="price">(.*?)</p>')) AS price
+FROM de.html_data hd;
+
+INSERT INTO ST.LIDS_LOG (DT, LINK, USER_AGENT, REGION)
+SELECT 
+  temp_1.date, 
+  temp_1.link,
+  temp_1.user_agent,
+  temp_2.region 
+FROM (
+  SELECT 
+    TO_TIMESTAMP(part_2[1], 'YYYYMMDDHH24MISS')::date AS date,
+    TRIM(CONCAT('http', part_1[1])) AS link,
+    TRIM(SUBSTRING(data, STRPOS(data, part_3[1]))) AS user_agent,
+    TRIM(part_4[1]) AS ip
+  FROM de.log, 
+  LATERAL REGEXP_MATCH(data, 'http(.*?)\s') AS part_1, 
+  LATERAL REGEXP_MATCH(data, '\d{14}') AS part_2, 
+  LATERAL REGEXP_MATCH(data, '[ABCDEFGHIJKLMNOPQRSFTUVWXYZ]\w+') AS part_3,
+  LATERAL REGEXP_MATCH(data, '\d+\.\d+\.\d+\.\d+') AS part_4
+) AS temp_1
+JOIN (
+  SELECT 
+    data_part_1[1] AS ip,
+    TRIM(data_part_2[1]) AS region
+  FROM de.ip,
+  LATERAL REGEXP_MATCH(data, '\d+\.\d+\.\d+\.\d+') AS data_part_1,
+  LATERAL REGEXP_MATCH(data, '\s.+') AS data_part_2
+) AS temp_2
+ON temp_1.ip = temp_2.ip;
+
+ SELECT * FROM ST.LIDS_BOOK_INFO;
