@@ -1,4 +1,5 @@
-CREATE TABLE st.ndam_salary_hist (
+
+CREATE TABLE st.lids_salary_hist (
     PERSON VARCHAR(255),
     CLASS VARCHAR(255),
     SALARY NUMERIC(10,2),
@@ -18,11 +19,11 @@ WITH hist AS (
           - INTERVAL '1 day' AS effective_to
     FROM de.histgroup
 )
-INSERT INTO ST.ndam_SALARY_HIST (PERSON, CLASS, SALARY, EFFECTIVE_FROM, EFFECTIVE_TO)
+INSERT INTO ST.lids_salary_hist (PERSON, CLASS, SALARY, EFFECTIVE_FROM, EFFECTIVE_TO)
 SELECT person, class, salary, effective_from, effective_to
 FROM hist;
 
-CREATE TABLE ST.ndam_SALARY_LOG (
+CREATE TABLE ST.lids_salary_log (
     PAYMENT_DT DATE,
     PERSON VARCHAR(255),
     PAYMENT NUMERIC(10,2),
@@ -42,7 +43,7 @@ WITH salary_payments AS (
 ),
 salary_info AS (
     -- Объединяем платежи с историей зарплат:
-    -- для каждого платежа находим запись из ST.ndam_SALARY_HIST,
+    -- для каждого платежа находим запись из ST.lids_salary_hist,
     -- в которой payment_dt попадает в диапазон EFFECTIVE_FROM и EFFECTIVE_TO
     SELECT
         h.person,
@@ -53,7 +54,7 @@ salary_info AS (
         sp.payment,
         sp.payment_year,
         sp.payment_month
-    FROM ST.ndam_SALARY_HIST h
+    FROM ST.lids_salary_hist h
     JOIN salary_payments sp
         ON h.person = sp.person
        AND sp.payment_dt BETWEEN h.effective_from AND h.effective_to
@@ -71,9 +72,9 @@ monthly_aggregation AS (
     FROM salary_info
     GROUP BY person, payment_year, payment_month
 )
--- Сохраняем результат в таблицу ST.ndam_SALARY_LOG.
+-- Сохраняем результат в таблицу ST.lids_salary_log.
 -- Для каждого платежа выводим его дату, сумму и добавляем агрегированные значения за месяц.
-INSERT INTO ST.ndam_SALARY_LOG (PAYMENT_DT, PERSON, PAYMENT, MONTH_PAID, MONTH_REST)
+INSERT INTO ST.lids_salary_log (PAYMENT_DT, PERSON, PAYMENT, MONTH_PAID, MONTH_REST)
 SELECT 
     si.payment_dt,
     si.person,
@@ -86,6 +87,3 @@ JOIN monthly_aggregation ma
    AND si.payment_year = ma.payment_year 
    AND si.payment_month = ma.payment_month
 ORDER BY si.payment_dt;
-
-select * from st.ndam_salary_hist
-select * from st.ndam_salary_log
